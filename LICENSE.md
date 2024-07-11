@@ -1,6 +1,6 @@
 MIT License
 
-Copyright (c) 2024 Franck Charras
+Copyright (c) 2024 WIMMICS, Inria centre at Université Côte d'Azur
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
