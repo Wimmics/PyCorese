@@ -1,0 +1,46 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.version]
+path = "./VERSION.txt"
+pattern = "(?P<version>[^']+)"
+
+[project]
+name = "PyCorese"
+dynamic = ["version"]
+authors = []
+description = "PyCorese - Corese SPARQL engine Python API."
+keywords = ["SPARQL"]
+readme = "README.md"
+license = {file = "LICENSE"}
+requires-python = ">=3.10"
+dependencies = [
+  "py4j>=0.10.9.7",
+  "jpype1>=1.5.0",
+]
+
+# TODO: set proper classifiers here
+# https://pypi.org/classifiers/
+classifiers = [
+    "Development Status :: 1 - Planning",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "Programming Language :: Python :: 3",
+]
+
+[project.urls]
+Homepage = "https://github.com/Wimmics/PyCorese"
+Issues = "https://github.com/Wimmics/PyCorese/issues"
+Documentation = "https://wimmics.github.io/PyCorese/"
+Repository = "https://github.com/Wimmics/pycorese.git"
+
+[tool.pytest.ini_options]
+# We follow the pytest recommendations by setting the `import-mode` and using
+# the `src/tests` layout.
+# https://docs.pytest.org/en/stable/explanation/goodpractices.html#tests-outside-application-code
+testpaths = [
+    "src/",
+    "tests/"
+]
+pythonpath = "src"

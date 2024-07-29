@@ -1,0 +1,21 @@
+# See https://docs.astral.sh/ruff/linter/#rule-selection
+[lint]
+select = [
+    # pycodestyle
+    "E",
+    # Pyflakes
+    "F",
+    # pyupgrade
+    "UP",
+    # flake8-bugbear
+    "B",
+    # flake8-simplify
+    "SIM",
+    # isort
+    "I",
+    # pydocstyle
+    "D"
+]
+
+[lint.pydocstyle]
+convention = "numpy"
