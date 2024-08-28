@@ -10,10 +10,15 @@ PyCorese is a Python package that provides a convenient way to wrap [Corese](htt
 
 ## Installation
 
-To install PyCorese, simply run the following command:
+To install PyCorese, you simply run the following command:
 
 ```bash
 pip install pycorese
+```
+To install from the current github master use:
+    
+```bash
+pip install git+https://github.com/wimmics/PyCorese.git
 ```
 
 ## Usage
