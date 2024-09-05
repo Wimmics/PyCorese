@@ -16,6 +16,9 @@ select = [
     # pydocstyle
     "D"
 ]
+# Skip unused variable rules (`I001`).
+ignore = ["I001"]
 
 [lint.pydocstyle]
 convention = "numpy"
+

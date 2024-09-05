@@ -1,73 +1,66 @@
-import os
-import urllib.request
+"""Implementation of the JPype bridge to Corese API in Java."""
+
 import logging
+import os
+
+from importlib import resources
+from pathlib import Path
+
+# Importing jpype.imports enables the functionality to import Java classes as 
+# if they were Python modules, e.g. from fr.inria.corese.core import Graph
+# Importing all classes from jpype.types enables the functionality to use Java
+# types in Python, e.g. JArray, JClass, JBoolean, JByte, JChar, JShort, JInt, 
+#                       JLong, JFloat, JDouble, JString, JObject, JException
+# https://jpype.readthedocs.io/en/latest/userguide.html#importing-java-classes
+
 import jpype
 import jpype.imports
-from jpype.types import *  
+from jpype.types import *
 
 #from . import configure_logging
 #configure_logging()
 
 
-#TODO: should we store the defaults somewhere else?
-#leaving it like this until the distribution method is figured out
-
-CORESE_LIBRARY_URL = 'https://repo1.maven.org/maven2/fr/inria/corese/corese-core/4.5.0/corese-core-4.5.0-jar-with-dependencies.jar' 
-CORESE_LIBRARY_PATH = os.path.join(os.path.dirname(__file__), 'jars', 'corese-core-4.5.0-jar-with-dependencies.jar')
-
+_CORESE_LIBRARY_PATH = Path(resources.files(__package__))\
+                       .joinpath('jars/corese-core-4.5.0-jar-with-dependencies.jar')\
+                       .resolve()
 
 class JPypeBridge:
     """
-    Python implementation of Corese API.
-    
-    :param corese_url: URL to download Corese library
-    :param corese_path: Path to Corese library
-    
+    Python wrapper of the Java Corese API using JPype bridge.
+
+    Parameters
+    ----------
+    corese_path : str, optional
+        Path to the Corese-core library. Default is None. If None, use the library 
+        downloaded during package installation.
+  
     """
 
-    def __init__(self, corese_url=None, corese_path=None):
+    def __init__(self, corese_path=None): 
 
-        self.corese_url = corese_url or CORESE_LIBRARY_URL
-        self.corese_path = corese_url or CORESE_LIBRARY_PATH
+        self.corese_path = corese_path or (_CORESE_LIBRARY_PATH)
 
         if not os.path.exists(self.corese_path):
-            self._downloadCoreseCore()
-        else:
-            logging.info('JPype: Corese-core is already downloaded')
+            raise FileNotFoundError(
+                '\n'.join([f'CORESE library is not found at {self.corese_path}.',
+                           f'Reinstall the {__package__} package.'])
+            )
 
         # Register exit handler
         import atexit
         _ = atexit.register(self._exit_handler)
-	
-    def __del__(self):
-        self._exit_handler()
-        
+       
     def _exit_handler(self):
         jpype.shutdownJVM()
         logging.info('CORESE is stopped')
-
-
-    def _downloadCoreseCore(self):
-        """Download Corese-core library with dependencies."""
-        try: 
-            # create directory if it does not exist
-            os.makedirs(os.path.dirname(self.corese_path), exist_ok=True)
-            
-            logging.info('Downloading CORESE from %s...', self.corese_url)
-            urllib.request.urlretrieve(self.corese_url, self.corese_path)
-            logging.info('CORESE is downloaded')
-        
-        except Exception as e:
-            logging.error('CORESE failed to download: %s', str(e))
-
-			
+		
     def loadCorese(self) -> jpype:
         """Load Corese library into context of JPype."""  
-        # Because of lack of JVM support, you cannot shutdown the JVM and then restart it.
+        # NOTE: Because of lack of JVM support, you cannot shutdown the JVM and then restart it.
         # Nor can you start more than one copy of the JVM.
         # https://jpype.readthedocs.io/en/latest/install.html#known-bugs-limitations
 
-        # catch the exception if corese cannot start
         try:
 
             # check if JVM is already running
@@ -79,11 +72,12 @@ class JPypeBridge:
 
 
             # Import of class
-            from fr.inria.corese.core import Graph
-            from fr.inria.corese.core.load import Load
-            from fr.inria.corese.core.logic import RDF
-            from fr.inria.corese.core.print import ResultFormat
-            from fr.inria.corese.core.query import QueryProcess
+            from fr.inria.corese.core import Graph # type: ignore
+            from fr.inria.corese.core.load import Load  # type: ignore
+            from fr.inria.corese.core.logic import RDF  # type: ignore
+            from fr.inria.corese.core.print import ResultFormat  # type: ignore
+            from fr.inria.corese.core.query import QueryProcess  # type: ignore
+
 
             self.Graph = Graph
             self.Load = Load
