@@ -1,0 +1,4 @@
+@prefix ex: <http://example.org/> .
+
+ex:John a ex:Person .
+ex:Person rdfs:subClassOf ex:Agent .
