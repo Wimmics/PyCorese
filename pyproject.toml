@@ -1,17 +1,19 @@
 [build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"
+requires = ["setuptools>=42", "wheel"] # add "setuptools_scm" if we want to use github tags for versioning
+build-backend = "setuptools.build_meta"
 
-[tool.hatch.version]
-path = "./VERSION.txt"
-pattern = "(?P<version>[^']+)"
+
+[tool.setuptools.dynamic]
+version = { file = "VERSION.txt" }
 
 [project]
 name = "PyCorese"
 dynamic = ["version"]
-authors = []
+authors = [
+    { name = "Anna Bobasheva", email = "anna.bobasheva@inria.fr" },
+]
 description = "PyCorese - Corese SPARQL engine Python API."
-keywords = ["SPARQL"]
+keywords = ["Query Engine", "SPARQL", "SHACL", "RDF", "RDFS", "OWL", "Reasoning", "Knowledge Graph"]
 readme = "README.md"
 license = {file = "LICENSE"}
 requires-python = ">=3.10"
@@ -44,3 +46,18 @@ testpaths = [
     "tests/"
 ]
 pythonpath = "src"
+
+# Adding the Java jars to the package
+# https://setuptools.pypa.io/en/stable/userguide/datafiles.html#package-data
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+#"*" = ["jars/*.jar"]
+"PyCorese" = ["jars/*.jar"]
+
+
+
