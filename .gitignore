@@ -162,6 +162,3 @@ cython_debug/
 
 # VSCode
 .vscode
-
-# JAR repository
-jars/

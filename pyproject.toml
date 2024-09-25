@@ -20,6 +20,7 @@ requires-python = ">=3.10"
 dependencies = [
   "py4j>=0.10.9.7",
   "jpype1>=1.5.0",
+  "pandas>=1.3.3",
 ]
 
 # TODO: set proper classifiers here
