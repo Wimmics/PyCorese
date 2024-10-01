@@ -59,6 +59,8 @@ xmlns:rdfs='http://www.w3.org/2000/01/rdf-schema#'>
  <rdf:type rdf:resource='http://example.com/Album'/>
 </rdf:Description>
 
+<!-- To demonstrate RDFS reasoning-->
+
 <rdf:Description rdf:about="http://example.com/SoloArtist">
     <rdfs:subClassOf rdf:resource="http://example.com/Person"/>
 </rdf:Description>
