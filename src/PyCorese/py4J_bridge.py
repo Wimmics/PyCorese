@@ -44,7 +44,7 @@ class Py4JBridge:
         # Register exit handler
         import atexit
         _ = atexit.register(self._exit_handler)
-        
+
     def _exit_handler(self) -> None:
         if self.java_gateway is not None:
             self.java_gateway.shutdown()
@@ -53,7 +53,7 @@ class Py4JBridge:
     def unloadCorese(self):
         """
         Explicitly unload Corese library.
-        
+
         It's not necessary to call this method, as the library is automatically
         unloaded when the Python interpreter exits.
         """
@@ -62,14 +62,14 @@ class Py4JBridge:
 
     def loadCorese(self,  memory_allocation=None) -> JavaGateway:
         """Load Corese-Python library in the context of Py4J.
-        
+
         Parameters
         ----------
         memory_allocation : str, optional
             Memory allocation for the JVM, e.g. '4g'. Default is automatic allocation by JVM.
-                
+
         Returns
-        -------            
+        -------
         JavaGateway
             Py4J JavaGateway object.
         """
@@ -85,12 +85,12 @@ class Py4JBridge:
             if memory_allocation:
                 java_args.extend(f'-Xmx{memory_allocation}')
 
-            self.java_gateway = JavaGateway.launch_gateway(classpath=str(self.corese_path), 
+            self.java_gateway = JavaGateway.launch_gateway(classpath=str(self.corese_path),
                                                             javaopts=java_args,
                                                             die_on_exit=True)
-            #sleep(1.0)  
+            #sleep(1.0)
 
-            
+
             # This is a minimum set of classes required for the API to work
             # if we need more classes we should think about how to expose
             # them without listing every single one of them here
@@ -100,6 +100,7 @@ class Py4JBridge:
             self.QueryProcess = self.java_gateway.jvm.fr.inria.corese.core.query.QueryProcess
             self.ResultFormat = self.java_gateway.jvm.fr.inria.corese.core.print.ResultFormat
             self.RDF = self.java_gateway.jvm.fr.inria.corese.core.logic.RDF
+            self.RDFS = self.java_gateway.jvm.fr.inria.corese.core.logic.RDFS
             self.RuleEngine = self.java_gateway.jvm.fr.inria.corese.core.rule.RuleEngine
             self.Transformer = self.java_gateway.jvm.fr.inria.corese.core.transform.Transformer
 
@@ -108,15 +109,12 @@ class Py4JBridge:
             self.CoreseGraphDataManagerBuilder = self.java_gateway.jvm.fr.inria.corese.core.storage.CoreseGraphDataManagerBuilder
 
             self.Shacl  = self.java_gateway.jvm.fr.inria.corese.core.shacl.Shacl
-            self.Loader = self.java_gateway.jvm.fr.inria.corese.core.api.Loader
+            #self.Loader = self.java_gateway.jvm.fr.inria.corese.core.api.Loader
             
             
             logging.info('Py4J: CORESE is loaded')
 
         except Exception as e:
-            logging.error('Py4J: CORESE failed to load: %s', str(e)) 
+            logging.error('Py4J: CORESE failed to load: %s', str(e))
 
         return self.java_gateway
-
-
-		

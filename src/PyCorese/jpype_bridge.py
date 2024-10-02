@@ -6,10 +6,10 @@ import os
 from importlib import resources
 from pathlib import Path
 
-# Importing jpype.imports enables the functionality to import Java classes as 
+# Importing jpype.imports enables the functionality to import Java classes as
 # if they were Python modules, e.g. from fr.inria.corese.core import Graph
 # Importing all classes from jpype.types enables the functionality to use Java
-# types in Python, e.g. JArray, JClass, JBoolean, JByte, JChar, JShort, JInt, 
+# types in Python, e.g. JArray, JClass, JBoolean, JByte, JChar, JShort, JInt,
 #                       JLong, JFloat, JDouble, JString, JObject, JException
 # https://jpype.readthedocs.io/en/latest/userguide.html#importing-java-classes
 
@@ -50,7 +50,7 @@ class JPypeBridge:
         # Register exit handler
         import atexit
         _ = atexit.register(self._exit_handler)
-       
+
     def _exit_handler(self):
         jpype.shutdownJVM()
         logging.info('JPype: CORESE is stopped')
@@ -58,33 +58,33 @@ class JPypeBridge:
     def unloadCorese(self, force=False):
         """
         Explicitly unload Corese library.
-        
+
         It's not necessary to call this method, as the library is automatically
         unloaded when the Python interpreter exits.
         """
         logging.info('JPype: WARNING: CORESE cannot be restarted after unloading.')
-        
+
         if force:
             self._exit_handler()
             self.java_gateway = None
         else:
-            logging.info('JPype: If the unloading is necessary run unloadCorese method with the force=True option')    
-		
+            logging.info('JPype: If the unloading is necessary run unloadCorese method with the force=True option')
+
     def loadCorese(self,  memory_allocation=None) -> jpype:
         """
         Load Corese library into context of JPype.
-        
+
         Parameters
         ----------
         memory_allocation : str, optional
             Memory allocation for the JVM, e.g. '4g'. Default is automatic allocation by JVM.
-        
+
         Returns
         -------
-            
+
             jpype
             JPype object.
-        """  
+        """
         # NOTE: Because of lack of JVM support, you cannot shutdown the JVM and then restart it.
         # Nor can you start more than one copy of the JVM.
         # https://jpype.readthedocs.io/en/latest/install.html#known-bugs-limitations
@@ -107,7 +107,7 @@ class JPypeBridge:
             # Import of class
             from fr.inria.corese.core import Graph # type: ignore
             from fr.inria.corese.core.load import Load  # type: ignore
-            from fr.inria.corese.core.logic import RDF  # type: ignore
+            from fr.inria.corese.core.logic import RDF, RDFS  # type: ignore
             from fr.inria.corese.core.print import ResultFormat  # type: ignore
             from fr.inria.corese.core.query import QueryProcess  # type: ignore
             from fr.inria.corese.core.rule import RuleEngine  # type: ignore
@@ -118,31 +118,29 @@ class JPypeBridge:
             from fr.inria.corese.core.storage import CoreseGraphDataManagerBuilder  # type: ignore
 
             from fr.inria.corese.core.shacl import Shacl # type: ignore
-            from fr.inria.corese.core.api import Loader # type: ignore
-            
+            #from fr.inria.corese.core.api import Loader # type: ignore
+
             self.DataManager = DataManager
             self.CoreseGraphDataManager = CoreseGraphDataManager
             self.CoreseGraphDataManagerBuilder = CoreseGraphDataManagerBuilder
-            
+
             self.Graph = Graph
             self.Load = Load
             self.QueryProcess = QueryProcess
             self.ResultFormat = ResultFormat
             self.RDF = RDF
+            self.RDFS = RDFS
             self.RuleEngine = RuleEngine
             self.Transformer = Transformer
-            
+
             self.Shacl = Shacl
-            self.Loader = Loader
+            #self.Loader = Loader
 
             logging.info('JPype: CORESE is loaded')
 
 
         except Exception as e:
-            logging.error('JPype: CORESE failed to load: %s', str(e)) 
-     
+            logging.error('JPype: CORESE failed to load: %s', str(e))
+
 
         return jpype
-    
-
-		

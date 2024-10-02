@@ -1,6 +1,29 @@
 """The module provides the capability to launch corese-python jar."""
 import pandas as pd
 from io import StringIO
+import os
+import re
+from collections import namedtuple
+
+def _isFile(input: str):
+    file_path_pattern = r'^(?:[a-zA-Z]:\\|\.{1,2}[\\\/]|\/)?(?:[\w\-\s]+[\\\/]?)+[\w\-\s]+\.[\w]+$'
+
+    if re.match(file_path_pattern, input):
+        if os.path.isfile(input):
+            return True                
+        else:
+            raise FileNotFoundError (f"The file {input} does not exist.") 
+
+    return False
+
+def _is_rdf_xml(content):
+    rdf_xml_pattern = r'^\s*<\?xml.*\?>.*<rdf:RDF'
+    return re.search(rdf_xml_pattern, content, re.DOTALL) is not None    
+
+def _is_turtle(content):
+    turtle_pattern = r'(@prefix|@base|<[^>]+>\s*<[^>]+>\s*<[^>]+>|<[^>]+>\s*<[^>]+>\s*"[^"]*")'
+    return re.search(turtle_pattern, content) is not None
+
 
 class CoreseAPI:
     """
@@ -33,6 +56,13 @@ class CoreseAPI:
         """
         self._bridge.unloadCorese()
 
+        self.java_gateway = None
+
+        self.Graph = None
+        self.QueryProcess = None
+        self.ResultFormat = None
+        self.Load = None
+
     def loadCorese(self) -> None:
         """Load Corese library into JVM and expose the Corese classes."""
         if self.java_bridge == 'py4j':
@@ -41,38 +71,23 @@ class CoreseAPI:
 
             self._bridge = Py4JBridge()
             self.java_gateway = self._bridge.loadCorese()
-        else:
+        elif self.java_bridge == 'jpype':
 
             from .jpype_bridge import JPypeBridge
 
             self._bridge = JPypeBridge()
             self.java_gateway =self._bridge.loadCorese()
+        else:
+            raise ValueError('Invalid java bridge. Only "py4j" and "jpype" are supported.')
 
-
-            # self.Graph = jpype_bridge.Graph
-            # self.Load = jpype_bridge.Load
-            # self.QueryProcess = jpype_bridge.QueryProcess
-            # self.ResultFormat = jpype_bridge.ResultFormat
-            # self.RDF = jpype_bridge.RDF
-            # self.RuleEngine = jpype_bridge.RuleEngine
-            # self.Transformer = jpype_bridge.Transformer
-
-            # # Classes to manage Graph(s) with different storage options
-            # self.DataManager = jpype_bridge.DataManager
-            # self.CoreseGraphDataManager = jpype_bridge.CoreseGraphDataManager
-            # self.CoreseGraphDataManagerBuilder = jpype_bridge.CoreseGraphDataManagerBuilder
-
-            # self.Shacl  = jpype_bridge.Shacl
-            # self.Loader = jpype_bridge.Loader
 
         # This is a minimum set of classes required for the API to work
-        # if you need more classes we should think about how to expose
+        # if we need more classes we should think about how to expose
         # them without listing every single one of them here
         self.Graph = self._bridge.Graph
         self.Load = self._bridge.Load
         self.QueryProcess = self._bridge.QueryProcess
         self.ResultFormat = self._bridge.ResultFormat
-        self.RDF = self._bridge.RDF
         self.RuleEngine = self._bridge.RuleEngine
         self.Transformer = self._bridge.Transformer
         
@@ -81,24 +96,39 @@ class CoreseAPI:
         self.CoreseGraphDataManager = self._bridge.CoreseGraphDataManager
         self.CoreseGraphDataManagerBuilder = self._bridge.CoreseGraphDataManagerBuilder
 
+        # Classes to manage SHACL validation 
         self.Shacl  = self._bridge.Shacl
-        self.Loader = self._bridge.Loader
-        
-    def loadRDF(self, rdf_file: str, graph=None)-> object:
+ 
+        # Define the known namespaces
+        Namespace = namedtuple('Namespace', ['RDF', 'RDFS', 'SHACL'])
+        self.Namespaces = Namespace(
+            self._bridge.RDF.RDF, 
+            self._bridge.RDFS.RDFS, 
+            'http://www.w3.org/ns/shacl#'
+        )
+
+        self.SHACL_REPORT_QUERY='''SELECT ?o ?p ?s
+                                   WHERE { ?o a sh:ValidationResult.
+                                           ?o ?p ?s. }'''
+
+ 
+    #TODO: Add support for the other RDF formats    
+    def loadRDF(self, rdf: str, graph=None)-> object:
         """
-        Load RDF file into Corese graph.
+        Load RDF file/string into Corese graph.
         
         Parameters
         ----------
-        rdf_file : str
-            Path to the RDF file.
+        rdf: str
+            Path to the RDF file or RDF content.
         graph : object (fr.inria.corese.core.Graph or
                         fr.inria.corese.core.storage.CoreseGraphDataManager), optional
             Corese graph object. Default is None.
             
         Returns
         -------
-        object (fr.inria.corese.core.Graph or fr.inria.core.storage.CoreseGraphDataManager)
+        object (fr.inria.corese.core.Graph or
+                fr.inria.core.storage.CoreseGraphDataManager)
             Corese Graph object.
         """
         if not self.java_gateway:
@@ -114,7 +144,16 @@ class CoreseAPI:
         graph_mgr = self.CoreseGraphDataManagerBuilder().build()
 
         ld = self.Load().create(graph, graph_mgr)
-        ld.parse(rdf_file)
+
+        if _isFile(rdf):
+            ld.parse(rdf)
+        else:
+            if _is_rdf_xml(rdf):
+                ld.loadString(rdf, self.Load.RDFXML_FORMAT)
+            elif _is_turtle(rdf):
+                ld.loadString(rdf, self.Load.TURTLE_FORMAT)
+            else:
+                raise ValueError('Unsupported RDF format. Only RDF/XML and Turtle are supported by this version')
 
         return graph_mgr
 
@@ -145,17 +184,18 @@ class CoreseAPI:
             assert self.RuleEngine, 'Corese classes are not loaded properly.'
             assert graph, 'Graph object is required.'
             assert profile, 'Profile object is required.'
+            #TODO: assert profile is valid
 
             if replace:
                 self.resetRuleEngine(graph)
-            
+
             rule_engine = self.RuleEngine.create(graph)
 
             rule_engine.setProfile(profile)
             rule_engine.process()
 
             return rule_engine
-    
+
     def resetRuleEngine(self, graph: object)-> None:
         """
         Reset the rule engine for the given graph.
@@ -172,16 +212,16 @@ class CoreseAPI:
         assert self.RuleEngine, 'Corese classes are not loaded properly.'
         assert graph, 'Graph object is required.'
 
-        rule_engine = self.RuleEngine.create(graph.getGraph())    
+        rule_engine = self.RuleEngine.create(graph.getGraph())
         rule_engine.remove()
 
     def sparqlSelect(self, graph: object,
                     prefixes: str|list|None = None,
                     query: str ='SELECT * WHERE {?s ?p ?o} LIMIT 5',
-                    return_dataframe: bool =True)-> object:    
+                    return_dataframe: bool =True)-> object|pd.DataFrame:    
         """ 
         Execute SPARQL SELECT or ASK query on Corese graph.
-        
+
         Parameters
         ----------
         graph : object (fr.inria.corese.core.Graph)
@@ -198,12 +238,13 @@ class CoreseAPI:
             Result of the SPARQL
 
         """
-        assert self.QueryProcess, 'Corese classes are not loaded properly.'    
+        assert self.QueryProcess, 'Corese classes are not loaded properly.'
         assert self.ResultFormat, 'Corese classes are not loaded properly.'
 
         if not graph:
             raise ValueError('Graph object is required.')
         
+        #TODO: extract method to create a prefix string
         if not prefixes:
             prefixes = ''
         if isinstance(prefixes, list):
@@ -224,7 +265,7 @@ class CoreseAPI:
                             dtypes: list|dict|None = None)-> pd.DataFrame:
         """
         Convert Corese ResultFormat object to pandas DataFrame.
-        
+
         Parameters
         ----------
         queryResult : csv resultFormat object (fr.inria.core.print.ResultFormat) 
@@ -232,15 +273,15 @@ class CoreseAPI:
         dtypes : list or dict, optional
             Data types for the columns in the format required by Pandas 
             read_csv method https://pandas.pydata.org/docs/reference/api/pandas.read_csv.html.
-            Default is None.     
+            Default is None.
 
         Returns
         -------
         pd.DataFrame
             Result in DataFrame format.
         """
-        #assert isinstance(queryResult, self.ResultFormat), 'Invalid query result object.'
-                 
+        assert self.ResultFormat, 'Corese classes are not loaded properly.'
+
         df = pd.read_csv(StringIO(str(queryResult)),
                             skipinitialspace=True,
                             dtype=dtypes)
@@ -275,7 +316,7 @@ class CoreseAPI:
         Returns
         -------
         object (fr.inria.core.print.ResultFormat)
-            Result of the SPARQL CONSTRUCT query in RDF?XML format.
+            Result of the SPARQL CONSTRUCT query in RDF/XML format.
         """
         assert self.QueryProcess, 'Corese classes are not loaded properly.'
         assert self.ResultFormat, 'Corese classes are not loaded properly.'
@@ -283,6 +324,7 @@ class CoreseAPI:
         if not graph:
             raise ValueError('Graph object is required.')
         
+        #todo: extract method to create a prefix string
         if not prefixes:
             prefixes = ''
         if isinstance(prefixes, list):
@@ -293,7 +335,7 @@ class CoreseAPI:
 
         if merge:
             graph.getGraph().merge(map.getGraph())
-        
+
         result = self.ResultFormat.create(map, self.ResultFormat.DEFAULT_CONSTRUCT_FORMAT)
 
         return result
@@ -318,30 +360,109 @@ class CoreseAPI:
         ttl = self.Transformer.create(rdf.getMappings().getGraph(), self.Transformer.TURTLE)
         
         return ttl.toString()
+    
+    #TODO: ASk Remi what are the acceptable shacl formats
+    def shaclValidate(self, graph: object, 
+                            prefixes: str|list|None = None,
+                            shacl_shape_ttl: str ='',
+                            return_dataframe = False)-> object:
+        """
+        Validate RDF graph against SHACL shape. 
+        
+        This Version supports only Turtle format.
 
-    def shaclValidate(self, graph, shacl_shape_ttl, is_file_name=False):
-        pass
-    # Parse validation results
-    def shaclValidationReport(self, validation_report_graph):
-       pass
+        Parameters
+        ----------
+        graph : object (fr.inria.corese.core.Graph)
+            Corese graph object.
+        shacl_shape_ttl : str
+            SHACL shape in Turtle format.
+        prefixes : str or list, optional
+            Prefixes. Default is None.
+
+        Returns
+        -------
+        str
+            SHACL validation report in Turtle format.
+        """
+        assert self.Shacl, 'Corese classes are not loaded properly.'
+
+        prefix_shacl = f'@prefix sh: <{self.Namespaces.SHACL}> .'            
+        
+        if not prefixes:
+            prefixes = ''
+        if isinstance(prefixes, list):
+            prefixes = '\n'.join(prefixes)
+
+        prefixes = '\n'.join([prefixes, prefix_shacl])    
+
+        shapeGraph = self.Graph()
+        ld = self.Load.create(shapeGraph)
+
+        if _isFile(shacl_shape_ttl):
+            # Load shape graph from file
+            ld.parse(shacl_shape_ttl)
+        else:
+            # Load shape graph from string
+            ld.loadString('\n'.join([prefixes, shacl_shape_ttl]),
+                          self.Load.TURTLE_FORMAT)
+
+        # Evaluation
+        shacl = self.Shacl(graph.getGraph(), shapeGraph)
+        result = shacl.eval()
+        
+        trans = self.Transformer.create(result, self.Transformer.TURTLE)
+
+        if return_dataframe:
+            return self.shaclReportToDataFrame(str(trans.toString()))
+
+        return str(trans.toString())
+
+    # Parse validation report
+    def shaclReportToDataFrame(self, validation_report: str)-> pd.DataFrame:
+        """
+        Convert SHACL validation report to pandas DataFrame.
+
+        Parameters
+        ----------
+        validation_report : str
+            SHACL validation report in Turtle format.
+
+        Returns
+        -------
+        pd.DataFrame
+            Validation report in DataFrame format.
+        """
+        prefix_shacl = f'@prefix sh: <{self.Namespaces.SHACL}> .'   
+
+        validation_report_graph = self.loadRDF(validation_report)
+
+        report = self.sparqlSelect(validation_report_graph, prefix_shacl, self.SHACL_REPORT_QUERY)
+
+        report = report.pivot(index='o', columns='p', values='s')
+        report.columns = [uri.split('#')[-1] for uri in report.columns]
+
+        #TODO cleanup the report
+
+        return report
 
 
 if __name__ == "__main__":
 
     # Initialize the CoreseAPI
-    cr = CoreseAPI(java_bridge='jpype')
+    cr = CoreseAPI(java_bridge='py4j')
     cr.loadCorese()
 
     # Load RDF file
-    gr = cr.loadRDF('C:\\Users\\abobashe\\Documents\\P16\\PyCorese\\examples\\data\\beatles.rdf')
+    gr = cr.loadRDF(os.path.abspath(os.path.join('.', 'examples', 'data','beatles.rdf')))
     print("Graph size: ", gr.graphSize())
 
     # Load Rule Engine OwlRL
-    re = cr.loadRuleEngine(gr, profile=cr.RuleEngine.Profile.OWLRL)
+    ren = cr.loadRuleEngine(gr, profile=cr.RuleEngine.Profile.OWLRL)
     print("Graph size: ", gr.graphSize())
 
-    # Load another Rule Engie e.g. RDFS to replace the existing one
-    re = cr.loadRuleEngine(gr, profile=cr.RuleEngine.Profile.RDFS, replace=True)
+    # Load another Rule Engine e.g. RDFS to replace the existing one
+    ren = cr.loadRuleEngine(gr, profile=cr.RuleEngine.Profile.RDFS, replace=True)
     print("Graph size: ", gr.graphSize())
 
     # Reset Rule Engine
@@ -363,10 +484,15 @@ if __name__ == "__main__":
 
     # Convert the result to Turtle
     print(cr.toTurtle(results))
-
+   
     # Execute SHACL validation
+    shacl_shape_file = '.\\examples\\data\\beatles-validator.ttl'
+    report = cr.shaclValidate(gr, shacl_shape_ttl=shacl_shape_file, prefixes=prefixes)
+    print(report)
 
-    # Execute SHACL validation report
+    # Convert SHACL validation report to DataFrame
+    shr = cr.shaclReportToDataFrame(report)
+    print(shr)
 
     # Shutdown the JVM
     cr.unloadCorese()
